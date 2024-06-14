@@ -13,7 +13,6 @@ void DHT11_main(void)
 {
 	uint8_t i_RH, d_RH, i_Tmp, d_Tmp;
 	
-	// HAL_TIM_Base_Start_IT(&htim2);
 	DHT11_Init();
 	
 	while(1)

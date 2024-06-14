@@ -25,6 +25,8 @@
 /* USER CODE BEGIN Includes */
 #include "lwip/udp.h"     // ADD_SIKWON
 #include "udp_echoserver.h"  // ADD_SIKWON
+#include "servomotor.h"
+#include "pwm_led.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,7 +42,8 @@ extern struct udp_pcb *upcb1;    // Add	UDP Control Block
 ip_addr_t addr1;   // Add
 extern uint8_t udp_data[100];    // Add
 struct pbuf *p1;    // Add  Send buffer
-char temp_str[40] = "";
+char temp_and_humid[40] = "";
+char humidInfo[40] = "";
 extern uint8_t i_RH, d_RH, i_Tmp, d_Tmp;
 //--------- UDP end ------------
 /* USER CODE END PD */
@@ -51,6 +54,8 @@ extern uint8_t i_RH, d_RH, i_Tmp, d_Tmp;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 
@@ -69,6 +74,8 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 extern void DHT11_Init(void);
 extern void DHT11_processing(void);
@@ -83,10 +90,12 @@ extern void DHT11_processing(void);
   * @retval None
   */
 volatile int TIM11_counter=0;
+volatile int TIM11_1ms_servo_count=0;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim->Instance == TIM11){
 		TIM11_counter++;
+		TIM11_1ms_servo_count++;
 	}
 
 }
@@ -125,9 +134,14 @@ int main(void)
   MX_LWIP_Init();
   MX_TIM10_Init();
   MX_TIM11_Init();
+  MX_TIM1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim11);  // ADD_MIKE_0614
   HAL_TIM_Base_Start_IT(&htim10);  // ADD_MIKE_0614
+  /* PWM START */
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1); // ADD_PWM_SERVO_MOTOR
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1); // ADD_PWM_LED
   //-------- TCP/IP start -------------------
   udp_echoserver_init();  // ADD_SIKWON
   upcb1 = udp_new();    // ADD create new UDP control block
@@ -143,26 +157,30 @@ int main(void)
   {
 	ethernetif_input(&gnetif);  // make ethernet packet as input mode
 	sys_check_timeouts();   //timeout check
+	servo_motor_in_PWM_manner();
+
+	turn_on_LED_in_PWM_manner();
 
 	if(TIM11_counter >= 1500){
 		TIM11_counter = 0;
 		DHT11_processing(); // call DHT11 processing
+		// The temperature information is contained in the temp_and_humid.
+/*		sprintf(temp_and_humid, "[Tmp]%d\n", (int) i_Tmp);
+		sprintf(humidInfo, "[Humid]%d\n", (int) i_RH);*/
+		sprintf(temp_and_humid, "[Tmp]%d [Hum]%d\n",(int) i_Tmp, (int) i_RH);
 
-		// The temperature information is contained in the temp_str.
-		sprintf(temp_str, "[Tmp]%d\n", (int) i_Tmp);
-		HAL_UART_Transmit(&huart3, temp_str, strlen(temp_str), 10); // timeout : 10ms
+		HAL_UART_Transmit(&huart3, temp_and_humid, strlen(temp_and_humid), 10); // timeout : 10ms
 		udp_connect(upcb1, &addr1, 9999); // make udp connection using 9999 local pc port
-		p1 = pbuf_alloc(PBUF_TRANSPORT, strlen((char*) temp_str),
+		p1 = pbuf_alloc(PBUF_TRANSPORT, strlen((char*) temp_and_humid),
 				PBUF_POOL); // assign system buffer to "p1"
 		if (p1 != NULL) // OK alloc
 		{
 			// 1. copy data to pbuf
-			pbuf_take(p1, (char*) temp_str, strlen((char*) temp_str));
+			pbuf_take(p1, (char*) temp_and_humid, strlen((char*) temp_and_humid));
 			// 2. send udp data
 			udp_send(upcb1, p1);
 			// 3. free the UDP connection
 			udp_disconnect(upcb1);
-
 			// 4. free pbuf
 			pbuf_free(p1);
 		} else {
@@ -218,6 +236,140 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 168-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 1000-1;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 1680-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1000-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
 }
 
 /**
@@ -364,6 +516,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
@@ -372,6 +525,9 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_TEST_GPIO_Port, LED_TEST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
@@ -395,6 +551,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LED_TEST_Pin */
+  GPIO_InitStruct.Pin = LED_TEST_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_TEST_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_PowerSwitchOn_Pin */
   GPIO_InitStruct.Pin = USB_PowerSwitchOn_Pin;

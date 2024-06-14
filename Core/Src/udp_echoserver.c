@@ -25,8 +25,8 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
-#define UDP_SERVER_PORT    7   /* define the UDP local connection port */
-#define UDP_CLIENT_PORT    7   /* define the UDP remote connection port */
+#define UDP_SERVER_PORT    9999   /* define the UDP local connection port */
+#define UDP_CLIENT_PORT    9999   /* define the UDP remote connection port */
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -72,9 +72,43 @@ void udp_echoserver_init(void)
   * @param port the remote port from which the packet was received
   * @retval None
   */
+uint8_t servo_flag = 0;     // Add
+uint8_t led_flag = 0;
+struct udp_pcb *upcb1;    // Add
+const ip_addr_t *addr1;   // Add
+uint8_t udp_data[100];    // Add
+extern UART_HandleTypeDef huart3;   //Add
 void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
 
+#if 1
+	  /* Connect to the remote client */
+	  udp_connect(upcb, addr, UDP_CLIENT_PORT);
+
+	  MEMCPY(udp_data, p->payload, sizeof(udp_data));// UDP data를 1 byte 읽어온다
+	  /* Tell the client that we have accepted it */
+	  if (strncmp(udp_data, "SERVO:", 6) == 0)
+	  {
+	 	  /* Tell the client that we have accepted it */
+		  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+	 	  servo_flag = 1;
+
+	  }
+
+	  if (strncmp(udp_data, "LED:", 4) == 0) {
+		  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+	 	  led_flag = 1;
+	  }
+
+	  /* Tell the client that we have accepted it */
+//	  udp_send(upcb, p);
+
+	  /* free the UDP connection, so we can accept new clients */
+	  udp_disconnect(upcb);
+
+	  /* Free the p buffer */
+	  pbuf_free(p);
+#else  // org
   /* Connect to the remote client */
   udp_connect(upcb, addr, UDP_CLIENT_PORT);
     
@@ -86,5 +120,5 @@ void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbu
 	
   /* Free the p buffer */
   pbuf_free(p);
-   
+#endif
 }
