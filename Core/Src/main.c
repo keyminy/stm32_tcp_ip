@@ -127,6 +127,7 @@ int main(void)
   MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim11);  // ADD_MIKE_0614
+  HAL_TIM_Base_Start_IT(&htim10);  // ADD_MIKE_0614
   //-------- TCP/IP start -------------------
   udp_echoserver_init();  // ADD_SIKWON
   upcb1 = udp_new();    // ADD create new UDP control block
