@@ -74,6 +74,7 @@ void udp_echoserver_init(void)
   */
 uint8_t servo_flag = 0;     // Add
 uint8_t led_flag = 0;
+uint8_t dht11_interval_flag = 0;
 struct udp_pcb *upcb1;    // Add
 const ip_addr_t *addr1;   // Add
 uint8_t udp_data[100];    // Add
@@ -85,7 +86,7 @@ void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbu
 	  /* Connect to the remote client */
 	  udp_connect(upcb, addr, UDP_CLIENT_PORT);
 
-	  MEMCPY(udp_data, p->payload, sizeof(udp_data));// UDP data를 1 byte 읽어온다
+	  MEMCPY(udp_data, p->payload, sizeof(udp_data));// udp_data를 1 byte 읽어온다
 	  /* Tell the client that we have accepted it */
 	  if (strncmp(udp_data, "SERVO:", 6) == 0)
 	  {
@@ -94,10 +95,14 @@ void udp_echoserver_receive_callback(void *arg, struct udp_pcb *upcb, struct pbu
 	 	  servo_flag = 1;
 
 	  }
-
 	  if (strncmp(udp_data, "LED:", 4) == 0) {
 		  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
 	 	  led_flag = 1;
+	  }
+
+	  if (strncmp(udp_data, "DHT11:", 6) == 0) {
+		  HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+		  dht11_interval_flag = 1;
 	  }
 
 	  /* Tell the client that we have accepted it */

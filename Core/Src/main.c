@@ -43,8 +43,10 @@ ip_addr_t addr1;   // Add
 extern uint8_t udp_data[100];    // Add
 struct pbuf *p1;    // Add  Send buffer
 char temp_and_humid[40] = "";
-char humidInfo[40] = "";
+char dht11_interval_arr[40] = "";
 extern uint8_t i_RH, d_RH, i_Tmp, d_Tmp;
+static int dht11_interval=1;
+extern uint8_t dht11_interval_flag;
 //--------- UDP end ------------
 /* USER CODE END PD */
 
@@ -161,13 +163,20 @@ int main(void)
 
 	turn_on_LED_in_PWM_manner();
 
-	if(TIM11_counter >= 1500){
+	if(dht11_interval_flag == 1){
+		dht11_interval_flag = 0;
+		HAL_GPIO_TogglePin(GPIOB, LD2_Pin); // to debug..
+		//received data : "DHT11:3"
+		strncpy(dht11_interval_arr,udp_data+6,2);
+		dht11_interval = atoi(dht11_interval_arr);
+	}
+
+	if(TIM11_counter >= 1000 * dht11_interval){
 		TIM11_counter = 0;
 		DHT11_processing(); // call DHT11 processing
-		// The temperature information is contained in the temp_and_humid.
-/*		sprintf(temp_and_humid, "[Tmp]%d\n", (int) i_Tmp);
-		sprintf(humidInfo, "[Humid]%d\n", (int) i_RH);*/
+
 		sprintf(temp_and_humid, "[Tmp]%d [Hum]%d\n",(int) i_Tmp, (int) i_RH);
+//		printf("[Tmp]%d [Hum]%d\n",(int) i_Tmp, (int) i_RH);
 
 		HAL_UART_Transmit(&huart3, temp_and_humid, strlen(temp_and_humid), 10); // timeout : 10ms
 		udp_connect(upcb1, &addr1, 9999); // make udp connection using 9999 local pc port

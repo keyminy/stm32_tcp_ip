@@ -14,7 +14,6 @@ void servo_motor_in_PWM_manner(void) {
 		servo_flag=0;
 		// udp_data = "SERVO:"
 		strncpy(servo,udp_data+6,2);
-		HAL_UART_Transmit(&huart3, servo, strlen(servo), 10);
 		__HAL_TIM_SET_COMPARE(&htim2,TIM_CHANNEL_1,atoi(servo));
 		delay_us(20);
 	}
