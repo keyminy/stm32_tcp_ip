@@ -82,14 +82,12 @@ void MainWindow::text_Reading(){
     QByteArray received;
 
     // 읽을 수 있는 만큼 port를 읽음
-    received = serial->readLine(); // QbyteArray형태로 집어넣는다
-//    while(serial->canReadLine()){
-//        // serial쪽에서 "\n"단위(newline)로 들어온다
-//        received = serial->readLine(); // QbyteArray형태로 집어넣는다
-//    }
-     qDebug() << "========ReceivedXXX=== : " <<received << Qt::endl;
+    while(serial->canReadLine()){
+        // serial쪽에서 "\n"단위(newline)로 들어온다
+        received = serial->readLine(); // QbyteArray형태로 집어넣는다
+    }
+
     if(received == "") return;
-        qDebug() << "Before Received : " <<received;
     received.remove(received.length()-1,2); // remove 끝의 2byte
     this->ui->textEdit_RecvUart->append(received);
     this->ui->textEdit_RecvUart->show(); //창에 나타내준다
@@ -122,7 +120,7 @@ void MainWindow::readyRead()
 
     // TODO : Parsing data "[Tmp]26 [Hum]38"
     QString data(buffer);
-    QStringList dataList = data.split(' ');
+    QStringList dataList = data.split(" ");
 
     // Print all elements in dataList
 //    qDebug() << "Data List Elements:";
