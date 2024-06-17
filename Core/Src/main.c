@@ -178,7 +178,7 @@ int main(void)
 		sprintf(temp_and_humid, "[Tmp]%d [Hum]%d\n",(int) i_Tmp, (int) i_RH);
 //		printf("[Tmp]%d [Hum]%d\n",(int) i_Tmp, (int) i_RH);
 
-		HAL_UART_Transmit(&huart3, temp_and_humid, strlen(temp_and_humid), 10); // timeout : 10ms
+		HAL_UART_Transmit(&huart3, temp_and_humid, strlen(temp_and_humid), 30); // timeout : 30ms!!!
 		udp_connect(upcb1, &addr1, 9999); // make udp connection using 9999 local pc port
 		p1 = pbuf_alloc(PBUF_TRANSPORT, strlen((char*) temp_and_humid),
 				PBUF_POOL); // assign system buffer to "p1"
